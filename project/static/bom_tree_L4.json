@@ -1,0 +1,818 @@
+[
+  {
+    "part_number": "HL0704B - 轿顶防护栏",
+    "level": 1,
+    "children": [
+      {
+        "part_number": "DIN127A-M6-430HV-B - 垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M4-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M5-430HV-B - 弹垫",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M6-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M8-430HV-Z - 标准弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "HAA102ACN - 标签",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA22802K - 软梯",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA24650E - 轿顶防护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA24658A - 防护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA24658AH - 后侧护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA25580L - 轿顶爬梯组件",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA308WN - 软梯盒子",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EJW - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EQC - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EYA - 轿顶护栏支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316EZX - 急停按钮支架",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA347AZA - 轿顶灯支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA386BQC - 板",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA386FHE - TOC安装板",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA393DL - 线槽",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA652C - 软绳",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "ISO15482ST4.8X25-H - 自钻自攻螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M5X10-8.8Z - 六角头螺栓 M5X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M6X60-8.8Z - 六角螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M8X60-8.8Z - 螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M4_8_Z - 六角头螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M5-8-Z - 六角螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M6-8-Z - 六角规则螺母(类型1) M6",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M8-8-Z - 六角规则螺母(类型1) M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M3X10Z_4_8Z - 十字槽盘头螺钉M3X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M4X12Z-4.8Z - 十字槽盘头螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M4X70Z-4.8Z - 十字螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M4-140HV-Z - 平垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089M4-140HV-Z - 平垫A级",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M6-140HV-Z - 平垫圈 标准系列 M6",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M8-140HV-Z - 平垫圈 标准系列 M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7091-M3-100HV-Z - 平垫圈3",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7093-M5-140HV-Z - 大垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7093-M6-140HV-Z - 大垫片",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON1241M6X12-8.8Z - 法兰螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON7201M3-8-Z - 六角锯齿法兰螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      }
+    ]
+  },
+  {
+    "part_number": "HL0704E - 轿顶防护栏",
+    "level": 1,
+    "children": [
+      {
+        "part_number": "DIN127B-M4-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M8-430HV-Z - 标准弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN6798A-M8-350HV-Z - 自锁垫片",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "HAA135FM - 金属管_轿顶防护栏_子组件",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA135FQ - 金属管_轿顶防护栏后部",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA147CY - 面板",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA147CZ - 背板",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA255ER - 调整垫片",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316ASP - 支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316AZJ - 支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316EJW - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EQC - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA347AZA - 轿顶灯支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA386FHE - TOC安装板",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "ISO15482ST4.8X25-H - 自钻自攻螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M8X60-8.8Z - 螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M8X70-8.8Z - 六角头螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M8-8-Z - 六角规则螺母(类型1) M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M3X10Z_4_8Z - 十字槽盘头螺钉M3X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M4X12Z-4.8Z - 十字槽盘头螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M4X70Z-4.8Z - 十字螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M4-140HV-Z - 平垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M8-140HV-Z - 平垫圈 标准系列 M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7091-M3-100HV-Z - 平垫圈3",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON7201M3-8-Z - 六角锯齿法兰螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      }
+    ]
+  },
+  {
+    "part_number": "HL0704L - 轿顶防护栏",
+    "level": 1,
+    "children": [
+      {
+        "part_number": "DIN127B-M10-430HV-Z - 弹簧垫圈 M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M4-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M8-430HV-Z - 标准弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "HAA135MN - 防护栏后侧横梁",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA24011Y - 侧防护栏装配",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA255HS - 防护栏调整垫片",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316ASP - 支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316DKR - DAMPER支架",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316DKS - ACD4支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316EJW - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EQC - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EYA - 轿顶护栏支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA347AZA - 轿顶灯支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA386FHE - TOC安装板",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "ISO15482ST4.8X25-H - 自钻自攻螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M10X70-8.8Z - 六角螺栓M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M8X60-8.8Z - 螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M10-8-Z - 六角规则螺母(类型1) M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M8-8-Z - 六角规则螺母(类型1) M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M3X10Z_4_8Z - 十字槽盘头螺钉M3X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M4X12Z-4.8Z - 十字槽盘头螺钉",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M10-140HV-Z - 平垫",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M4-140HV-Z - 平垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M8-140HV-Z - 平垫圈 标准系列 M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7091-M3-100HV-Z - 平垫圈3",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON7201M3-8-Z - 六角锯齿法兰螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      }
+    ]
+  },
+  {
+    "part_number": "HL0704Q - 轿顶防护栏",
+    "level": 1,
+    "children": [
+      {
+        "part_number": "DIN127A-M6-430HV-B - 垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127A-M8-430HV-B - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M10-430HV-Z - 弹簧垫圈 M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M16-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M5-430HV-B - 弹垫",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN127B-M6-430HV-Z - 弹簧垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "DIN6798A-M8-350HV-Z - 自锁垫片",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "HAA135RL - 后侧防护栏管",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA24011AL - 轿顶防护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA24011AM - 轿顶防护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA24658A - 防护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA24658AH - 后侧护栏",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA255ER - 调整垫片",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA255HS - 防护栏调整垫片",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316EQC - 轿顶检修盒支架总装图",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA316EYA - 轿顶护栏支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA316EZX - 急停按钮支架",
+        "level": 2,
+        "children": [],
+        "type": "EBOM"
+      },
+      {
+        "part_number": "HAA347AZA - 轿顶灯支架",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "HAA386BQC - 板",
+        "level": 2,
+        "children": [],
+        "type": "PART"
+      },
+      {
+        "part_number": "ISO4017M10X70-8.8Z - 六角螺栓M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M16X80-8.8Z - 螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M5X10-8.8Z - 六角头螺栓 M5X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M6X20-8.8Z - 六角头螺栓M6X20",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M6X60-8.8Z - 六角螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4017M8X60-8.8Z - 螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M10-8-Z - 六角规则螺母(类型1) M10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M16-8-Z - 六角螺母 M16",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M5-8-Z - 六角螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M6-8-Z - 六角规则螺母(类型1) M6",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO4032M8-8-Z - 六角规则螺母(类型1) M8",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7045M3X10Z_4_8Z - 十字槽盘头螺钉M3X10",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M10-140HV-Z - 平垫",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M16-140HV-Z - 平垫圈M16-140HV-Z",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7089-M6-140HV-Z - 平垫圈 标准系列 M6",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7091-M3-100HV-Z - 平垫圈3",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7093-M5-140HV-Z - 大垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7093-M6-140HV-Z - 大垫片",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "ISO7093-M8-140HV-Z - 大垫圈",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON1241M6X12-8.8Z - 法兰螺栓",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      },
+      {
+        "part_number": "NON7201M3-8-Z - 六角锯齿法兰螺母",
+        "level": 2,
+        "children": [],
+        "type": "STDP"
+      }
+    ]
+  }
+]
