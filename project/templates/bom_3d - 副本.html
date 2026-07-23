@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>3D BOM – Stable</title>
+<style>
+body { margin:0; overflow:hidden; background:#ffffff; }
+#search {
+  position:absolute; left:10px; top:10px; z-index:10;
+}
+#search input{
+  width:200px; background:#020617; color:#e5e7eb;
+  border:1px solid #1e293b; border-radius:6px;
+  padding:6px 10px; font-size:12px;
+}
+#search button{
+  margin-left:4px;
+  background:#020617;
+  color:#e5e7eb;
+  border:1px solid #1e293b;
+  border-radius:6px;
+  padding:6px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+#search button:hover{ background:#020617; border-color:#38bdf8; }
+
+#tooltip{
+  position:absolute; display:none; z-index:20;
+  background:rgba(15,23,42,.95); color:#fff;
+  padding:6px 10px; font-size:12px;
+  border-radius:4px; pointer-events:none;
+}
+
+#side-panel{
+  position:fixed; right:0; top:0;
+  width:360px; height:100%;
+  background:#020617; color:#e5e7eb;
+  border-left:1px solid #1e293b;
+  padding:16px; box-sizing:border-box;
+  transform:translateX(100%);
+  transition:.25s ease; overflow-y:auto; z-index:30;
+}
+#side-panel.open{ transform:translateX(0); }
+
+.field{ font-size:13px; margin-bottom:8px; }
+.field span{ width:90px; display:inline-block; color:#94a3b8; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/static/libs/three/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="search">
+  <input id="searchInput" placeholder="搜索件号（Enter）">
+</div>
+<div style="position:absolute; left:10px; top:50px; z-index:10;">
+  <button id="mode-toggle" style="
+    width:260px;
+    background:#020617;
+    color:#e5e7eb;
+    border:1px solid #1e293b;
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:12px;
+    cursor:pointer;
+  ">
+    模式：节点
+  </button>
+</div>
+<div style="position:absolute; left:10px; top:90px; z-index:10;">
+  <select id="config-select" style="
+    width:600px;
+    background:#020617;
+    color:#e5e7eb;
+    border:1px solid #1e293b;
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:12px;
+  "></select>
+</div>
+<div id="tooltip"></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/static/libs/three/examples/jsm/controls/OrbitControls.js";
+let mode = "node"; // node | config
+const $ = id => document.getElementById(id);
+
+/* ================= Scene ================= */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x3a3746);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(120, 120, 120);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.zIndex = "1";   //  canvas 在下层
+
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dl = new THREE.DirectionalLight(0xffffff, 1);
+dl.position.set(120, 120, 120);
+scene.add(dl);
+const COLORS = {
+  PMS: 0xfacc15,   // 黄色
+  SCS: 0xef4444,   // 红色
+  SS:  0x22c55e,   // 绿色
+  ODS: 0xffffff,   
+  ODS_HL: 0xffffff 
+};
+const EDGE_COLOR_SET_1 = {
+  PMS_SCS: 0xff4d4f, // 红
+  SCS_SS:  0xff4d4f,
+  SS_ODS:  0xff4d4f,
+  SCS_ODS: 0xff4d4f
+};
+
+const EDGE_COLOR_SET_2 = {
+  PMS_SCS: 0x60a5fa, // 蓝
+  SCS_SS:  0x60a5fa,
+  SS_ODS:  0x60a5fa,
+  SCS_ODS: 0x60a5fa
+};
+
+let rootNode;
+const partIndex = new Map();
+const activeEdgeMeshes = [];
+const logicalNodes = {
+  PMS: new Map(),
+  SCS: new Map(),
+  SS:  new Map(),
+  ODS: new Map()
+};
+const TYPE_ORDER = {
+  PMS: 0,
+  SCS: 1,
+  SS:  2,
+  ODS: 3
+};
+const layerNodeIndex = {
+  PMS: new Set(),
+  SCS: new Set(),
+  SS: new Set(),
+  ODS: new Set()
+};
+let selectClickCount = 0;  
+
+function getActiveEdgeColors() {
+  if (selectClickCount % 2 === 1) {
+    return EDGE_COLOR_SET_1; // ✅ 第1次 → 红
+  } else {
+    return EDGE_COLOR_SET_2; // ✅ 第2次 → 蓝
+  }
+}
+
+function sortByType(list) {
+  return [...list].sort((a, b) => {
+    const ta = getNodeTypeByPartNumber(a);
+    const tb = getNodeTypeByPartNumber(b);
+    const wa = TYPE_ORDER[ta] ?? 99;
+    const wb = TYPE_ORDER[tb] ?? 99;
+
+    //  先按 type 排序
+    if (wa !== wb) return wa - wb;
+
+    //  同 type 再按件号字母排序，保证稳定
+    return a.localeCompare(b);
+  });
+}
+
+function traverse(node, fn) {
+  fn(node);
+  node.children?.forEach(c => traverse(c, fn));
+}
+
+function initNode(n, p = null) {
+  n.parent = p;
+  if (!partIndex.has(n.part_number)) {
+    partIndex.set(n.part_number, []);
+  }
+  partIndex.get(n.part_number).push(n);
+  n.children?.forEach(c => initNode(c, n));
+}
+
+function initModeToggle() {
+  const btn = document.getElementById("mode-toggle");
+  const select = document.getElementById("config-select");
+
+  btn.onclick = () => {
+    if (mode === "node") {
+      // ✅ 切到 config 模式
+      mode = "config";
+      btn.textContent = "模式：参数";
+
+      // ✅ 解锁 dropdown
+      select.disabled = false;
+      select.style.opacity = 1.0;
+
+      // ✅ 清除之前点击效果
+      clearActiveEdges();
+      clearODSHighlightAndRegion();
+      restoreUpperLayerColors();
+      closeSidePanel(); // ✅ 关闭侧边栏
+
+      // ✅ 应用当前 config
+      const idx = Number(select.value || 0);
+      if (configs[idx]) {
+        applyConfig(configs[idx]);
+      }
+
+    } else {
+      // ✅ 切回 node 模式
+      mode = "node";
+      btn.textContent = "模式：节点";
+
+      // ✅ 锁定 dropdown
+      select.disabled = true;
+      select.style.opacity = 0.5;
+
+      // ✅ 恢复默认显示
+      clearActiveEdges();
+      clearODSHighlightAndRegion();
+      restoreUpperLayerColors();
+      closeSidePanel(); // ✅ 关闭侧边栏
+
+      // ✅ 把透明度恢复
+      ["PMS","SCS","SS","ODS"].forEach(type=>{
+        logicalNodes[type].forEach(ln=>{
+          if (!ln._mesh) return;
+          const mat = ln._mesh.material;
+
+          mat.opacity = 1.0;
+
+          if (mat.emissive) {
+            mat.emissive.setHex(0x000000);
+            mat.emissiveIntensity = 0;
+          }
+        });
+      });
+    }
+  };
+}
+
+function closeSidePanel() {
+  const panel = document.getElementById("side-panel");
+  if (!panel) return;
+
+  panel.classList.remove("open");
+}
+
+function normalizeType(root) {
+  // ✅ 把 ROOT 的直接子节点当作 PMS
+  root.children?.forEach(n => {
+    if (!n.type || n.type === "ROOT") {
+      n.type = "PMS";
+    }
+  });
+}
+
+function getCategoryOpacity(cat) {
+  if (cat === "NE") return 1.0;
+  if (cat === "MOD") return 1.0;
+  if (cat === "ALL") return 1.0;
+  return 1.0;
+}
+
+/* ================= Build Logical Nodes ================= */
+function buildLogicalNodes(root) {
+  // ✅ 清空（每次重建）
+  Object.keys(layerNodeIndex).forEach(k => layerNodeIndex[k].clear());
+  Object.values(logicalNodes).forEach(m => m.clear());
+
+  traverse(root, n => {
+    if (!n.type) return;
+
+    // ✅ 规范 type（防脏数据）
+    let type = String(n.type).trim().toUpperCase();
+    if (!logicalNodes[type]) return;
+
+    const map = logicalNodes[type];
+    layerNodeIndex[type].add(n.part_number);
+
+    // ✅ 规范 category（关键修复）
+    let rawCat = n.category;
+    if (rawCat === undefined || rawCat === null) rawCat = "";
+
+    rawCat = String(rawCat).trim().toUpperCase();
+
+    const cat =
+      rawCat === "NE" ? "NE" :
+      rawCat === "MOD" ? "MOD" :
+      rawCat === "ALL" ? "ALL" :
+      "ALL";
+
+    // ✅ 建 node
+    if (!map.has(n.part_number)) {
+      map.set(n.part_number, {
+        part_number: n.part_number,
+        type: type,
+        category: cat,
+        instances: [],
+        _mesh: null
+      });
+    } else {
+      // ✅ 合并 category（带优先级）
+      const ln = map.get(n.part_number);
+
+      const priority = { NE: 3, MOD: 2, ALL: 1 };
+
+      if (priority[cat] > priority[ln.category]) {
+        ln.category = cat;
+      }
+    }
+
+    // ✅ push instance
+    map.get(n.part_number).instances.push(n);
+  });
+}
+
+function getLayerByPartNumber(pn) {
+  for (const type of ["PMS", "SCS", "SS", "ODS"]) {
+    if (layerNodeIndex[type].has(pn)) return type;
+  }
+  return null;
+}
+
+function getNodeTypeByPartNumber(pn) {
+  if (logicalNodes.PMS?.has(pn)) return "PMS";
+  if (logicalNodes.SCS?.has(pn)) return "SCS";
+  if (logicalNodes.SS?.has(pn))  return "SS";
+  if (logicalNodes.ODS?.has(pn)) return "ODS";
+  return "?";
+}
+
+function groupByCategory(list) {
+  const groups = {
+    NE: [],
+    MOD: [],
+    ALL: []
+  };
+
+  list.forEach(n => {
+    let cat = n.category;
+
+    if (!cat) cat = "ALL";
+    cat = String(cat).trim().toUpperCase();
+
+    if (!groups[cat]) cat = "ALL";
+
+    groups[cat].push(n);
+  });
+
+  return groups;
+}
+
+window.showSidePanel = function (ln) {
+  if (!ln) return;
+
+  const panel = ensureSidePanel();
+  panel.classList.add("open");
+  document.getElementById("sp-id").textContent = ln.part_number;
+  document.getElementById("sp-type").textContent = ln.type;
+  document.getElementById("sp-category").textContent = ln.category;
+  let childList = [];
+  let parentList = [];
+  let count = 0;
+
+  // ===== PMS =====
+  if (ln.type === "PMS") {
+    const down = pmsToSCSMap.get(ln.part_number);
+    childList = down ? [...down] : [];
+    parentList = []; // PMS 没上游
+  }
+
+  // ===== SCS =====
+  else if (ln.type === "SCS") {
+    const parentSet = new Set();
+    const childSet = new Set();
+  //  1. 上游：找 PMS
+  if (!ln || !ln.instances) return;  
+  ln.instances.forEach(inst => {
+      let p = inst.parent;
+      while (p) {
+        if (p.type === "PMS") {
+          parentSet.add(p.part_number);
+          break; //  只取最近的 PMS
+        }
+        p = p.parent;
+      }
+    });
+
+  //  从实例出发，找直接下游 SS / ODS
+  if (!ln || !ln.instances) return;  
+  ln.instances.forEach(inst => {
+      if (!inst.children) return;
+
+      inst.children.forEach(child => {
+        if (child.type === "SS" || child.type === "ODS") {
+          childSet.add(child.part_number);
+        }
+      });
+    });
+    parentList = [...parentSet];
+    childList = [...childSet];
+  }
+
+  // ===== SS =====
+  else if (ln.type === "SS") {
+    // 上游 SCS
+    scsToSSMap.forEach((ssSet, scsPN) => {
+      if (ssSet.has(ln.part_number)) {
+        parentList.push(scsPN);
+      }
+    });
+
+    // 下游 ODS
+    const down = collectLogicalODSFromSS(ln.instances);
+    childList = [...down];
+  }
+
+  // ===== ODS =====
+  else if (ln.type === "ODS") {
+    const parentSet = new Set();
+    const chainList = [];
+    const odsPN = ln.part_number;
+
+    if (!ln || !ln.instances) return;
+    ln.instances.forEach(inst => {
+      const chain = [];
+
+      let p = inst.parent;
+
+    //  一路往上走：SS / SCS / PMS
+      while (p) {
+        if (p.type === "SS" || p.type === "SCS" || p.type === "PMS") {
+          chain.push({
+            type: p.type,
+            part_number: p.part_number
+        });
+      }
+        p = p.parent;
+    }
+
+      if (chain.length === 0) return;
+
+    //  最近上层（可能是 SS 或 SCS）
+      const nearest = chain[0];
+      parentSet.add(nearest.part_number);
+
+    //  构造完整路径
+      const fullChain = [
+        ...chain.slice().reverse(), // PMS → SCS → (SS?) 
+        { type: "ODS", part_number: odsPN }
+    ];
+
+      chainList.push(fullChain);
+  });
+
+    parentList = [...parentSet];
+    childList = [];
+    ln._upstreamChains = chainList;
+}
+  count = childList.length;
+  document.getElementById("sp-count").textContent = count;
+
+  //  渲染列表
+  renderParentList(parentList);
+  renderChildList(childList);
+  renderChainList(ln._upstreamChains);
+  const btn = document.getElementById("download-btn");
+
+  if (btn) {
+    btn.onclick = () => {
+      downloadSidePanelData(ln, parentList, childList);
+    };
+  }
+};
+
+function ensureSidePanel() {
+  let panel = document.getElementById("side-panel");
+  if (panel) return panel;
+
+  panel = document.createElement("div");
+  panel.id = "side-panel";
+  panel.style.position = "fixed";
+  panel.style.right = "0";
+  panel.style.top = "0";
+  panel.style.width = "360px";
+  panel.style.height = "100%";
+  panel.style.background = "#020617";
+  panel.style.color = "#e5e7eb";
+  panel.style.borderLeft = "1px solid #1e293b";
+  panel.style.padding = "16px";
+  panel.style.boxSizing = "border-box";
+  panel.style.zIndex = "9999";
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <h3 style="margin-top:0">节点信息</h3>
+
+    <div class="field">
+      <span>件号：</span><b id="sp-id">-</b>
+    </div>
+    <div class="field">
+      <span>类型：</span><span id="sp-type">-</span>
+    </div>
+    <div class="field">
+      <span>分类：</span><span id="sp-category">-</span>
+    </div>
+    <div class="field">
+      <span>下层连接数：</span><span id="sp-count">-</span>
+    </div>
+
+    <hr style="border:0;border-top:1px solid #1e293b;margin:12px 0">
+    <hr style="border:0;border-top:1px solid #1e293b;margin:12px 0">
+
+    <div class="field">
+      <span>直接上层节点：</span>
+    </div>
+
+    <div id="sp-parents" style="
+      max-height:160px;
+      overflow-y:auto;
+      border:1px solid #1e293b;
+      border-radius:6px;
+      padding:6px;
+      font-size:13px;
+    ">
+    <div style="color:#64748b">（无）</div>
+    </div>
+    <div class="field">
+      <span>直接下层节点：</span>
+    </div>
+
+    <div id="sp-children" style="
+      max-height:260px;
+      overflow-y:auto;
+      border:1px solid #1e293b;
+      border-radius:6px;
+      padding:6px;
+      font-size:13px;
+    ">
+      <div style="color:#64748b">（无）</div>
+    </div>
+        <div class="field">
+      <span>ODS 链路：</span>
+    </div>
+
+    <div id="sp-chains" style="
+      max-height:200px;
+      overflow-y:auto;
+      border:1px solid #1e293b;
+      border-radius:6px;
+      padding:6px;
+      font-size:13px;
+    ">
+    <div style="color:#64748b">（无）</div>
+    </div>
+    <button id="download-btn" style="
+  margin-top:12px;
+  width:100%;
+  padding:8px;
+  background:#0ea5e9;
+  border:none;
+  border-radius:6px;
+  color:white;
+  cursor:pointer;
+">
+  下载信息
+</button>
+  `;
+
+  document.body.appendChild(panel);
+  return panel;
+}
+
+function emphasizeNode(mesh) {
+  if (!mesh) return;
+
+  //  放大
+  mesh.scale.set(1.6, 1.6, 1.6);
+
+  // 发光（仅对 StandardMaterial 有效）
+  const mat = mesh.material;
+  if (mat && mat.emissive) {
+    mat.emissive.setHex(0xffffff);
+    mat.emissiveIntensity = 0.6;
+  }
+}
+
+function findLogicalNodeByPartNumber(pn) {
+  if (!pn) return null;
+
+  const maps = [
+    logicalNodes.PMS,
+    logicalNodes.SCS,
+    logicalNodes.SS,
+    logicalNodes.ODS
+  ];
+
+  for (const map of maps) {
+    if (map.has(pn)) {
+      return map.get(pn);
+    }
+  }
+  return null;
+}
+
+function renderChildList(list) {
+  const box = document.getElementById("sp-children");
+  if (!box) return;
+
+  box.innerHTML = "";
+
+  if (!list || list.length === 0) {
+    box.innerHTML = `<div style="color:#64748b">（无）</div>`;
+    return;
+  }
+  const sorted = sortByType(list);
+  sorted.forEach(pn => {
+    const type = getNodeTypeByPartNumber(pn);
+    const ln = findLogicalNodeByPartNumber(pn);
+    const cat = ln?.category || "ALL";
+    const div = document.createElement("div");
+    div.style.padding = "4px 6px";
+    div.style.borderRadius = "4px";
+    div.style.cursor = "pointer";
+    div.style.display = "flex";
+    div.style.justifyContent = "space-between";
+    div.style.alignItems = "center";
+    div.innerHTML = `
+      <span>${pn}</span>
+      <span style="font-size:11px; opacity:0.7">[${type} | ${cat}]</span>
+    `;
+    div.onmouseenter = () => div.style.background = "#1e293b";
+    div.onmouseleave = () => div.style.background = "transparent";
+    box.appendChild(div);
+  });
+}
+
+function renderParentList(list) {
+  const box = document.getElementById("sp-parents");
+  if (!box) return;
+  box.innerHTML = "";
+
+  if (!list || list.length === 0) {
+    box.innerHTML = `<div style="color:#64748b">（无）</div>`;
+    return;
+  }
+  const sorted = sortByType(list);
+  sorted.forEach(pn => {
+    const type = getNodeTypeByPartNumber(pn);
+    const ln = findLogicalNodeByPartNumber(pn);
+    const cat = ln?.category || "ALL";
+    const div = document.createElement("div");
+    div.style.padding = "4px 6px";
+    div.style.borderRadius = "4px";
+    div.style.cursor = "pointer";
+    div.style.marginBottom = "2px";
+    div.style.display = "flex";
+    div.style.justifyContent = "space-between";
+    div.style.alignItems = "center";
+    div.innerHTML = `
+      <span>${pn}</span>
+      <span style="font-size:11px; opacity:0.7">[${type} | ${cat}]</span>
+    `;
+    div.onmouseenter = () => div.style.background = "#1e293b";
+    div.onmouseleave = () => div.style.background = "transparent";
+    box.appendChild(div);
+  });
+}
+
+function renderChainList(chains) {
+  const box = document.getElementById("sp-chains");
+  if (!box) return;
+  box.innerHTML = "";
+
+  if (!chains || chains.length === 0) {
+    box.innerHTML = `<div style="color:#64748b">（无）</div>`;
+    return;
+  }
+
+  chains.forEach(chain => {
+    const div = document.createElement("div");
+    const text = chain
+      .map(n => `${n.part_number}`)
+      .join(" → ");
+
+    div.textContent = text;
+    div.style.padding = "4px 6px";
+    div.style.borderRadius = "4px";
+    div.style.marginBottom = "4px";
+
+    box.appendChild(div);
+  });
+}
+
+function downloadSidePanelData(ln, parentList, childList) {
+  if (!ln) return;
+  let rows = [];
+
+  // 基础信息
+  rows.push(["件号", ln.part_number]);
+  rows.push(["类型", ln.type]);
+  rows.push(["下层连接数", childList.length]);
+  rows.push([]);
+
+  // 上层节点
+  rows.push(["直接上层节点", ""]);
+  if (!parentList || parentList.length === 0) {
+    rows.push(["(无)", ""]);
+  } else {
+    parentList.forEach(p => {
+      const type = getNodeTypeByPartNumber(p);
+      rows.push([type, p]);
+    });
+  }
+  rows.push([]);
+
+  // 下层节点
+  rows.push(["直接下层节点", ""]);
+  if (!childList || childList.length === 0) {
+    rows.push(["(无)", ""]);
+  } else {
+    childList.forEach(c => {
+      const type = getNodeTypeByPartNumber(c);
+      rows.push([type, c]);
+    });
+  }
+  rows.push([]);
+
+  // ODS 链路
+  rows.push(["ODS链路", ""]);
+
+  if (!ln._upstreamChains || ln._upstreamChains.length === 0) {
+    rows.push(["(无)", ""]);
+  } else {
+    // 表头
+    rows.push(["PMS", "SCS", "SS", "ODS"]);
+
+    ln._upstreamChains.forEach(chain => {
+      const row = ["", "", "", ""];
+
+      chain.forEach(n => {
+        if (n.type === "PMS") row[0] = n.part_number;
+        if (n.type === "SCS") row[1] = n.part_number;
+        if (n.type === "SS")  row[2] = n.part_number;
+        if (n.type === "ODS") row[3] = n.part_number;
+      });
+
+      rows.push(row);
+    });
+  }
+
+  const BOM = "\uFEFF";
+  const csvContent = rows
+    .map(r => r.join(","))  
+    .join("\n");
+
+  const blob = new Blob([BOM + csvContent], {
+    type: "application/vnd.ms-excel;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${ln.part_number}_info.csv`; 
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function collectUpstreamChain(inst) {
+  const chain = [];
+  let p = inst.parent;
+
+  while (p) {
+    if (p.type === "SS" || p.type === "SCS" || p.type === "PMS") {
+      chain.push({
+        type: p.type,
+        part_number: p.part_number
+      });
+    }
+    p = p.parent;
+  }
+
+  return chain; // 顺序：SS → SCS → PMS（从近到远）
+}
+
+function restoreUpperLayerColors() {
+  ["PMS", "SCS", "SS"].forEach(type => {
+    logicalNodes[type].forEach(ln => {
+      if (!ln._mesh) return;
+
+      const mesh = ln._mesh;
+      const mat = mesh.material;
+
+      //  颜色 & 透明度
+      mat.color.setHex(mesh.userData.baseColor);
+      mat.opacity = 1.0;
+
+      //  缩放复位
+      mesh.scale.set(1, 1, 1);
+
+      //  发光复位
+      if (mat.emissive) {
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0.0;
+      }
+    });
+  });
+}
+
+function clearActiveEdges() {
+  activeEdgeMeshes.forEach(l => scene.remove(l));
+  activeEdgeMeshes.length = 0;
+}
+
+function clearODSHighlightAndRegion() {
+  //  恢复所有 ODS 的基础状态
+  logicalNodes.ODS.forEach(ods => {
+    if (!ods._mesh) return;
+
+    const mesh = ods._mesh;
+    const mat = mesh.material;
+
+    //  颜色 & 透明度
+    mat.color.setHex(COLORS.ODS);
+    mat.opacity = 0.35;
+
+    //  关键：恢复尺寸
+    mesh.scale.set(1, 1, 1);
+
+    //  如果你之前给 ODS 加过 emissive，也顺手清掉
+    if (mat.emissive) {
+      mat.emissive.setHex(0x000000);
+      mat.emissiveIntensity = 0.0;
+    }
+  });
+
+  //  清理 ODS 区域（如果有）
+  if (window.__odsRegionMeshes) {
+    window.__odsRegionMeshes.forEach(m => scene.remove(m));
+    window.__odsRegionMeshes.length = 0;
+  }
+}
+
+function drawActiveLine(a, b, color,offsetSign = 0) {
+  const start = a.clone();
+  const end   = b.clone();
+
+  //  确保 start 在上，end 在下
+  let top = start;
+  let bottom = end;
+  if (start.y < end.y) {
+    top = end;
+    bottom = start;
+  }
+  const span = top.y - bottom.y;
+
+  //  垂直感参数（关键）
+  const k1 = 0.8;  
+  const k2 = 0.2;  
+  const offset = 2.5; // ✅ 偏移量（可调）
+  const c1 = new THREE.Vector3(
+    top.x + offset * offsetSign,
+    top.y - span * k1,
+    top.z
+  );
+
+  const c2 = new THREE.Vector3(
+    bottom.x + offset * offsetSign,
+    top.y - span * k2,
+    bottom.z
+  );
+
+  const curve = new THREE.CubicBezierCurve3(
+    top,
+    c1,
+    c2,
+    bottom
+  );
+
+  const points = curve.getPoints(50);
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.85
+  });
+
+  const line = new THREE.Line(geometry, material);
+  scene.add(line);
+  activeEdgeMeshes.push(line);
+}
+
+function drawConfigEdges(partSet) {
+  clearActiveEdges(); // ✅ 先清掉旧线
+
+  const color = 0xfacc15; // ✅ 和高亮统一（金色）
+
+  // ===== PMS → SCS =====
+  pmsToSCSMap.forEach((scsSet, pmsPN) => {
+    if (!partSet.has(pmsPN)) return;
+
+    const pms = logicalNodes.PMS.get(pmsPN);
+    if (!pms || !pms._mesh) return;
+
+    scsSet.forEach(scsPN => {
+      if (!partSet.has(scsPN)) return;
+
+      const scs = logicalNodes.SCS.get(scsPN);
+      if (!scs || !scs._mesh) return;
+
+      drawActiveLine(pms._mesh.position, scs._mesh.position, color);
+    });
+  });
+
+  // ===== SCS → SS =====
+  scsToSSMap.forEach((ssSet, scsPN) => {
+    if (!partSet.has(scsPN)) return;
+
+    const scs = logicalNodes.SCS.get(scsPN);
+    if (!scs || !scs._mesh) return;
+
+    ssSet.forEach(ssPN => {
+      if (!partSet.has(ssPN)) return;
+
+      const ss = logicalNodes.SS.get(ssPN);
+      if (!ss || !ss._mesh) return;
+
+      drawActiveLine(scs._mesh.position, ss._mesh.position, color);
+    });
+  });
+
+  // ===== SS → ODS =====
+  logicalNodes.SS.forEach(ss => {
+    if (!partSet.has(ss.part_number)) return;
+
+    const ssMesh = ss._mesh;
+    if (!ssMesh) return;
+
+    const odsSet = collectLogicalODSFromSS(ss.instances);
+
+    odsSet.forEach(odsPN => {
+      if (!partSet.has(odsPN)) return;
+
+      const ods = logicalNodes.ODS.get(odsPN);
+      if (!ods || !ods._mesh) return;
+
+      drawActiveLine(ssMesh.position, ods._mesh.position, color);
+    });
+  });
+}
+
+function drawLayerPlane(y, size, color, opacity = 0.02) {
+  const geo = new THREE.PlaneGeometry(size, size);
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = y - 0.6; // 稍微压在节点下面
+  scene.add(mesh);
+}
+
+function drawLayerLabel(text, y, x = -120, z = -120, bgColor = "rgba(15,23,42,0.4)", textColor = "#e5e7eb") {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = 512;
+  canvas.height = 128;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // ✅ 使用传入背景色
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 32, canvas.width, 64);
+
+  // ✅ 文字颜色
+  ctx.font = "bold 60px sans-serif";
+  ctx.fillStyle = textColor;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(150, 50, 1);
+  sprite.position.set(x, y + 0.5, z);
+
+  scene.add(sprite);
+}
+
+function drawCategoryLabel(text, y, x, z) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = 512;
+  canvas.height = 128;
+
+  ctx.fillStyle = "rgba(15,23,42,0.7)";
+  ctx.fillRect(0, 32, canvas.width, 64);
+
+  ctx.font = "bold 42px sans-serif";   // ✅ 比层小
+  ctx.fillStyle = "#e5e7eb";
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false
+  });
+
+  const sprite = new THREE.Sprite(material);
+
+  sprite.scale.set(80, 30, 1);   // ✅ 更小
+  sprite.position.set(x, y + 2, z);
+
+  scene.add(sprite);
+}
+
+function drawAdaptiveODSPlane(centers, y, color, opacity = 0.06, padding = 80) {
+  if (!centers || centers.length === 0) return;
+
+  let minX = Infinity, maxX = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+
+  centers.forEach(p => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  });
+
+  const width  = (maxX - minX) + padding * 2;
+  const depth  = (maxZ - minZ) + padding * 2;
+
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+
+  const geo = new THREE.PlaneGeometry(width, depth);
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(centerX, y - 0.6, centerZ);
+
+  scene.add(mesh);
+  return mesh;
+}
+
+/* ================= Layout ================= */
+const GAP_Y = 24;
+const nodeMeshes = [];
+
+function drawLogicalLayer(type, y, size, gap) {
+  const list = [...logicalNodes[type].values()];
+
+  // ✅ 分组
+  const groups = groupByCategory(list);
+
+  const order = ["NE", "ALL", "MOD"];
+  const groupGapX = 200;   // ✅ 每个 category 横向间隔
+
+  order.forEach((cat, gi) => {
+    const subList = groups[cat];
+    if (!subList || subList.length === 0) return;
+
+    const cols = Math.ceil(Math.sqrt(subList.length));
+
+    subList.forEach((ln, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(size, 16, 16),
+        new THREE.MeshStandardMaterial({
+          color: COLORS[type],
+          transparent: true,
+          opacity: getCategoryOpacity(cat)   // ✅ 用 category 控制
+        })
+      );
+
+      mesh.position.set(
+        (col - cols / 2) * gap + (gi-1) * groupGapX,  // ✅ 分组偏移
+        y,
+        row * gap
+      );
+
+      mesh.userData.logicalNode = ln;
+      mesh.userData.baseColor = COLORS[type];
+
+      ln._mesh = mesh;
+      scene.add(mesh);
+      nodeMeshes.push(mesh);
+    });
+
+    // ✅ 可选：画 category 标签
+    drawCategoryLabel(`${type}-${cat}`, y, (gi-1) * groupGapX, -20);
+  });
+}
+
+/* ================= Structure Relations ================= */
+const structureEdgeMeshes = [];
+
+/* === 多对多关系 === */
+const pmsToSCSMap = new Map();
+const scsToSSMap  = new Map();
+
+function buildRelations() {
+  pmsToSCSMap.clear();
+  scsToSSMap.clear();
+
+  logicalNodes.PMS.forEach((pms, pmsPN) => {
+    if (!pms || !pms.instances) return;
+    pms.instances.forEach(inst => {
+      traverse(inst, n => {
+        if (n.type === "SCS") {
+          if (!pmsToSCSMap.has(pmsPN))
+            pmsToSCSMap.set(pmsPN, new Set());
+          pmsToSCSMap.get(pmsPN).add(n.part_number);
+        }
+      });
+    });
+  });
+
+  logicalNodes.SCS.forEach((scs, scsPN) => {
+    if (!scs || !scs.instances) return;
+    scs.instances.forEach(inst => {
+      traverse(inst, n => {
+        if (n.type === "SS") {
+          if (!scsToSSMap.has(scsPN))
+            scsToSSMap.set(scsPN, new Set());
+          scsToSSMap.get(scsPN).add(n.part_number);
+        }
+      });
+    });
+  });
+}
+
+/* ================= ODS ================= */
+const odsRegionMeshes = [];
+
+function collectLogicalODSFromSS(ssInstances) {
+  const set = new Set();
+  ssInstances.forEach(inst => {
+    traverse(inst, n => {
+      if (n.type === "ODS") set.add(n.part_number);
+    });
+  });
+  return set;
+}
+
+function getSSFromODSPartNumber(pn) {
+  if (!pn) return null;
+
+  // 去掉 C_ 之类的前缀
+  const clean = pn.replace(/^C_/, "");
+
+  // 必须是 HLxx 或 XLxx，且 xx 是紧跟其后的两位数字
+  const m = clean.match(/^(HL|XL)(\d{2})/);
+  if (!m) return null;
+
+  return "SS" + m[2];
+}
+
+function groupODSBySSCode() {
+  const map = new Map();
+  const used = new Set(); //  防止同一个 ODS 被多次处理
+
+  logicalNodes.ODS.forEach(ods => {
+    //  一个 logical ODS 只允许进一次
+    if (used.has(ods.part_number)) return;
+
+    const ssCode = getSSFromODSPartNumber(ods.part_number);
+    if (!ssCode) return;
+
+    used.add(ods.part_number);
+
+    if (!map.has(ssCode)) {
+      map.set(ssCode, []);
+    }
+    map.get(ssCode).push(ods);
+  });
+
+  return map;
+}
+
+function drawODSHexGroupForSS(odsList, centerX, centerZ, y) {
+  const gap = 6;
+  let i = 0;
+
+  // axial directions (pointy-top)
+  const directions = [
+    [1, 0], [1, -1], [0, -1],
+    [-1, 0], [-1, 1], [0, 1]
+  ];
+
+  //  先画中心
+  function place(q, r) {
+    if (i >= odsList.length) return false;
+
+    const ods = odsList[i++];
+
+    const x = centerX + gap * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+    const z = centerZ + gap * (3 / 2 * r);
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.3, 12, 12),
+      new THREE.MeshBasicMaterial({
+        color: COLORS.ODS,
+        transparent: true,
+        opacity: 0.35
+      })
+    );
+
+    mesh.position.set(x, y, z);
+    mesh.userData.logicalNode = ods;
+    ods._mesh = mesh;
+
+    scene.add(mesh);
+    nodeMeshes.push(mesh);
+
+    return true;
+  }
+
+  //  中心点
+  place(0, 0);
+
+  //  一圈一圈向外扩
+  for (let radius = 1; i < odsList.length; radius++) {
+    let q = -radius;
+    let r = radius;
+
+    for (let d = 0; d < 6; d++) {
+      const [dq, dr] = directions[d];
+
+      for (let step = 0; step < radius; step++) {
+        if (!place(q, r)) return;
+        q += dq;
+        r += dr;
+      }
+    }
+  }
+}
+
+function drawSSODSLabel(ssCode, x, y, z) {
+  drawCategoryLabel(
+    ssCode,
+    y + 20,   // 稍微浮在蜂窝上方
+    x,
+    z,
+    "#93c5fd" // 偏蓝，和 ODS 语义一致
+  );
+}
+
+function handleSelectLogicalNode(ln) {
+  const isSecond = (selectClickCount % 2 === 0);
+  const offsetSign = isSecond ? 1 : -1;
+  if (!ln || !ln._mesh) return;
+  if (!ln || !ln.instances) return;
+  const edgeColors = getActiveEdgeColors();
+  selectClickCount++;
+  //  每两次清空一次（关键逻辑）
+  if (selectClickCount % 2 === 1) {
+    // 第1、3、5次 → 清空
+    clearActiveEdges();
+    clearODSHighlightAndRegion();
+    restoreUpperLayerColors();
+    closeSidePanel(); // ✅ 关闭侧边栏
+  }
+
+  //  显示侧边栏
+  showSidePanel(ln);
+
+  //  高亮当前节点
+  ln._mesh.material.opacity = 1.0;
+  ln._mesh.material.color.setHex(COLORS[ln.type]);
+  emphasizeNode(ln._mesh);
+
+  // PMS
+  if (ln.type === "PMS") {
+    const scsSet = pmsToSCSMap.get(ln.part_number);
+    if (!scsSet) return;
+
+    scsSet.forEach(scsPN => {
+      const scs = logicalNodes.SCS.get(scsPN);
+      if (!scs || !scs._mesh) return;
+
+      scs._mesh.material.opacity = 1.0;
+      scs._mesh.material.color.setHex(COLORS.SCS);
+      drawActiveLine(ln._mesh.position, scs._mesh.position, edgeColors.PMS_SCS, offsetSign);
+    });
+  }
+
+  // SCS
+  else if (ln.type === "SCS") {
+  //  1. 高亮 SCS 自身
+    ln._mesh.material.opacity = 1.0;
+    ln._mesh.material.color.setHex(COLORS.SCS);
+
+    const highlighted = new Set();
+
+  //  2. 向上：高亮 PMS
+    
+    if (!ln || !ln.instances) return;
+    ln.instances.forEach(inst => {
+      let p = inst.parent;
+      while (p) {
+        if (p.type === "PMS") {
+          const key = "PMS:" + p.part_number;
+          if (highlighted.has(key)) break;
+          highlighted.add(key);
+
+          const pms = logicalNodes.PMS.get(p.part_number);
+          if (!pms || !pms._mesh) break;
+
+        // 高亮 PMS
+          pms._mesh.material.opacity = 1.0;
+          pms._mesh.material.color.setHex(COLORS.PMS);
+
+        // 画 PMS → SCS 连线
+          drawActiveLine(pms._mesh.position, ln._mesh.position, edgeColors.PMS_SCS, offsetSign);
+          break;
+      }
+        p = p.parent;
+      }
+    });
+
+  //  3. 向下：高亮 SS / ODS
+    if (!ln || !ln.instances) return;
+    ln.instances.forEach(inst => {
+      if (!inst.children) return;
+
+      inst.children.forEach(child => {
+        if (child.type !== "SS" && child.type !== "ODS") return;
+
+        const key = child.type + ":" + child.part_number;
+        if (highlighted.has(key)) return;
+        highlighted.add(key);
+
+        const down =
+          (child.type === "SS" ? logicalNodes.SS.get(child.part_number) : null) ||
+          (child.type === "ODS" ? logicalNodes.ODS.get(child.part_number) : null);
+
+        if (!down || !down._mesh) return;
+
+      // 高亮下游节点
+        down._mesh.material.opacity = 1.0;
+        down._mesh.material.color.setHex(COLORS[down.type]);
+
+      // 画 SCS → 下游 连线     
+        if (child.type === "SS") {
+          drawActiveLine(
+          ln._mesh.position,
+          down._mesh.position,
+          edgeColors.SCS_SS,
+          offsetSign
+        );
+}
+        if (child.type === "ODS") {
+          drawActiveLine(
+          ln._mesh.position,
+          down._mesh.position,
+          edgeColors.SCS_ODS,
+          offsetSign
+        );
+}
+      });
+    });
+  }
+
+  // SS
+  else if (ln.type === "SS") {
+    // 上游 SCS
+    scsToSSMap.forEach((ssSet, scsPN) => {
+      if (ssSet.has(ln.part_number)) {
+        const scs = logicalNodes.SCS.get(scsPN);
+        if (!scs || !scs._mesh) return;
+
+        scs._mesh.material.opacity = 1.0;
+        scs._mesh.material.color.setHex(COLORS.SCS);
+        drawActiveLine(scs._mesh.position, ln._mesh.position, edgeColors.SCS_SS, offsetSign);
+      }
+    });
+
+    // 下游 ODS
+    const related = collectLogicalODSFromSS(ln.instances);
+    logicalNodes.ODS.forEach(ods => {
+      const mat = ods._mesh.material;
+      if (related.has(ods.part_number)) {
+        mat.color.setHex(COLORS.ODS_HL);
+        mat.opacity = 1.0;
+        drawActiveLine(ods._mesh.position, ln._mesh.position, edgeColors.SS_ODS, offsetSign);
+      } else {
+        mat.color.setHex(COLORS.ODS);
+        mat.opacity = 0.35;
+      }
+    });
+  }
+  else if (ln.type === "ODS") {
+    //  高亮自身
+    ln._mesh.material.color.setHex(COLORS.ODS_HL);
+    ln._mesh.material.opacity = 1.0;
+
+    const visited = new Set();
+    if (!ln || !ln.instances) return;
+    ln.instances.forEach(inst => {
+      const chain = collectUpstreamChain(inst);
+
+      if (chain.length === 0) return;
+
+      //  Step 1：先构造“完整路径节点列表”
+      // [SS, SCS, PMS] → 转成 [ODS, SS, SCS, PMS]
+      const fullChain = [
+        { type: "ODS", part_number: ln.part_number },
+        ...chain
+      ];
+
+      //  Step 2：逐段连接（关键）
+      for (let i = 0; i < fullChain.length - 1; i++) {
+        const fromInfo = fullChain[i];
+        const toInfo   = fullChain[i + 1];
+
+        const key = fromInfo.type + ":" + fromInfo.part_number +
+                  "->" +
+                  toInfo.type + ":" + toInfo.part_number;
+
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        //  找对应 logical node
+        const from =
+          fromInfo.type === "ODS"
+            ? ln
+            : logicalNodes[fromInfo.type].get(fromInfo.part_number);
+
+        const to =
+          logicalNodes[toInfo.type].get(toInfo.part_number);
+
+        if (!from || !to || !from._mesh || !to._mesh) continue;
+
+        //  高亮节点
+        to._mesh.material.opacity = 1.0;
+        to._mesh.material.color.setHex(COLORS[to.type]);
+
+        //  画“逐层连接线”（重点）
+        drawActiveLine(
+          to._mesh.position,
+          from._mesh.position,
+          to.type === "SS"
+            ? edgeColors.SS_ODS
+            : to.type === "SCS"
+            ? edgeColors.SCS_SS
+            : edgeColors.PMS_SCS,
+          offsetSign
+        );
+      }
+  });
+}
+  //  相机对准
+  controls.target.copy(ln._mesh.position);
+  controls.update();
+}
+
+/* ================= Interaction ================= */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("mousemove", e => {
+  mouse.x = e.clientX / innerWidth * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight * 2 - 1);
+
+  raycaster.setFromCamera(mouse, camera);
+  const hit = raycaster.intersectObjects(nodeMeshes)[0];
+
+  const tip = $("tooltip");
+
+  if (hit && hit.object.userData?.logicalNode) {
+    const ln = hit.object.userData.logicalNode;
+    tip.style.display = "block";
+    tip.textContent = `${ln.type} [${ln.category}] : ${ln.part_number}`;
+    tip.style.left = e.clientX + 12 + "px";
+    tip.style.top  = e.clientY + 12 + "px";
+  } else {
+    tip.style.display = "none";
+  }
+});
+
+window.addEventListener("click", () => {  
+  // ✅ 参数模式下禁止点击
+  if (mode === "config") return;
+
+  raycaster.setFromCamera(mouse, camera);
+  const hit = raycaster.intersectObjects(nodeMeshes)[0];
+  if (!hit) return;
+
+  const ln = hit.object.userData.logicalNode;
+  if (!ln) return;
+
+  handleSelectLogicalNode(ln);
+});
+// ================= CONFIG SYSTEM =================
+let configs = [];
+
+// ✅ 1. 加载多个 JSON
+async function loadConfigs() {
+  configs = await Promise.all([
+    fetch("/static/bom_input_map1.json").then(r => r.json()),
+    fetch("/static/bom_input_map2.json").then(r => r.json())
+    // ✅ 后续可继续加
+  ]);
+
+  populateConfigDropdown(configs);
+}
+
+// ✅ 2. dropdown
+function populateConfigDropdown(configs) {
+  const select = document.getElementById("config-select");
+  
+  // 默认禁用
+  if (mode === "node") {
+    select.disabled = true;
+    select.style.opacity = 0.5;
+  }
+
+  select.innerHTML = "";
+
+  configs.forEach((cfg, idx) => {
+    const option = document.createElement("option");
+    option.value = idx;
+
+    const params = cfg.input_params || [];
+    option.textContent = params.join(", ")
+
+    select.appendChild(option);
+  });
+
+  // ✅ 切换事件
+  select.onchange = (e) => {
+    const idx = Number(e.target.value);
+    applyConfig(configs[idx]);
+  };
+}
+
+// ✅ 3. 高亮逻辑（核心）
+function applyConfig(config) {
+  if (!config || !config.bom_part_numbers) return;
+
+  const partSet = new Set(config.bom_part_numbers);
+
+  ["PMS", "SCS", "SS", "ODS"].forEach(type => {
+    const map = logicalNodes[type];
+
+    map.forEach((node, pn) => {
+      if (!node._mesh) return;
+
+      const mat = node._mesh.material;
+
+      if (partSet.has(pn)) {
+        // ✅ 命中 → 高亮（黄色发光）
+        if (mat.emissive) {
+          mat.emissive.setHex(0xffff00);
+          mat.emissiveIntensity = 1.2;
+        }
+        mat.opacity = 1.0;
+      } else {
+        // ✅ 非命中 → 降低存在感
+        if (mat.emissive) {
+          mat.emissive.setHex(0x000000);
+          mat.emissiveIntensity = 0;
+        }
+        mat.opacity = 0.15;
+      }
+    });
+  });
+  drawConfigEdges(partSet)
+}
+/* ================= Load ================= */
+fetch("/static/bom_tree_L4.json")
+  .then(r => r.json())
+  .then(data => {
+    rootNode = Array.isArray(data)
+      ? { part_number: "__ROOT__", type: "ROOT", children: data }
+      : data;
+
+    initNode(rootNode);
+    normalizeType(rootNode);
+    buildLogicalNodes(rootNode);
+    buildRelations();
+
+// ===== PMS =====
+    drawLogicalLayer("PMS", GAP_Y * 3, 4.0, 18);
+    drawLayerPlane(GAP_Y * 3, 600, COLORS.PMS, 0.08);
+    drawLayerLabel("PMS 层", GAP_Y * 3, 120, -320, "rgba(255,255,165,0.75)");
+
+// ===== SCS =====
+    drawLogicalLayer("SCS", 0, 4.0, 20);
+    drawLayerPlane(0, 620, COLORS.SCS, 0.10);
+    drawLayerLabel("SCS 层", 0, 120, -320, "rgba(252,165,165,0.75)");
+
+// ===== SS =====
+    drawLogicalLayer("SS", -GAP_Y * 3, 4.0, 30);
+    drawLayerPlane(-GAP_Y * 3, 660, COLORS.SS, 0.10);
+    drawLayerLabel("SS 层", -GAP_Y * 3, 120, -320, "rgba(134,239,172,0.75)");
+
+// ===== ODS =====
+//  1. 清理旧的 ODS mesh（必须最先）
+logicalNodes.ODS.forEach(ods => {
+  if (ods._mesh) {
+    scene.remove(ods._mesh);
+    ods._mesh = null;
+  }
+});
+let odsPlaneMesh = null;
+const odsY = -GAP_Y * 6;
+//  清理旧的 ODS 填充平面（关键）
+if (odsPlaneMesh) {
+  scene.remove(odsPlaneMesh);
+  odsPlaneMesh = null;
+}
+
+//  2. 分组
+const odsBySS = groupODSBySSCode();
+// ✅ 计算全局最大半径
+let globalMaxR = 0;
+odsBySS.forEach(list => {
+  const R = Math.ceil(Math.sqrt(list.length / 3));
+  if (R > globalMaxR) globalMaxR = R;
+});
+const ssCodes = [...odsBySS.keys()].sort();
+const cols = 6;
+
+//  3. 按行分组
+const rows = [];
+ssCodes.forEach((ssCode, idx) => {
+  const row = Math.floor(idx / cols);
+  if (!rows[row]) rows[row] = [];
+  rows[row].push(ssCode);
+});
+
+//  4. 计算行高
+const rowHeights = rows.map(rowSS => {
+  let maxR = 0;
+  rowSS.forEach(ssCode => {
+    const odsList = odsBySS.get(ssCode);
+    const R = Math.ceil(Math.sqrt(odsList.length / 3));
+    maxR = Math.max(maxR, R);
+  });
+  return globalMaxR * 18;
+});
+
+//  5. 画 ODS 蜂窝，并收集中心点
+const odsCenters = [];
+let zCursor = 0;
+
+rows.forEach((rowSS, rowIdx) => {
+  const rowGap = rowHeights[rowIdx];
+
+  rowSS.forEach((ssCode, colIdx) => {
+    const odsList = odsBySS.get(ssCode);
+
+    const R = Math.ceil(Math.sqrt(odsList.length / 3));
+    const colGap = globalMaxR * 16 + 100;
+    const offset = (rowIdx % 2) * (colGap / 2);
+
+    const cx = (colIdx - rowSS.length / 2) * colGap + offset;
+    const cz = zCursor;
+
+    drawODSHexGroupForSS(odsList, cx, cz, odsY);
+    drawSSODSLabel(ssCode, cx, odsY, cz);
+
+    odsCenters.push({ x: cx, z: cz });
+  });
+
+  zCursor += rowGap;
+});
+
+//  6. 最后再画「自适应 ODS 平面」
+odsPlaneMesh=drawAdaptiveODSPlane(
+  odsCenters,
+  odsY,
+  0xffffff,
+  0.1,
+  120
+);
+
+//  7. 最后画标签
+drawLayerLabel("ODS 层", odsY, 120, -320, "rgba(147,197,253,0.75)");
+loadConfigs();  // ✅ 加载配置文件
+initModeToggle();  // ✅ 初始化模式切换按钮
+  });
+
+/* ================= Render ================= */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+const searchInput = document.getElementById("searchInput");
+
+searchInput.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+
+  const keyword = searchInput.value.trim();
+  if (!keyword) return;
+
+  const ln = findLogicalNodeByPartNumber(keyword);
+
+  if (!ln) {
+    alert(`未找到件号：${keyword}`);
+    return;
+  }
+
+  handleSelectLogicalNode(ln);
+});
+</script>
+</body>
+</html>

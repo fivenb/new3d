@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>BOM上传</title>
+</head>
+<body>
+
+<h2>上传BOM Excel</h2>
+
+<p>
+    选择文件上传后，系统将自动分析BOM数据并生成3D模型。
+</p>
+
+<form id="uploadForm"
+      action="/upload"
+      method="post"
+      enctype="multipart/form-data">
+
+    <input type="file"
+           name="excel"
+           accept=".xlsx,.xls"
+           required>
+
+    <br><br>
+
+    <button id="uploadBtn" type="submit">
+        上传并分析
+    </button>
+
+</form>
+
+<div id="loading"
+     style="display:none;
+            margin-top:20px;
+            color:#2563eb;
+            font-weight:bold;">
+    正在上传并分析，请稍候...
+</div>
+
+<script>
+document.getElementById("uploadForm")
+    .addEventListener("submit", function () {
+
+        document.getElementById("uploadBtn").disabled = true;
+        document.getElementById("uploadBtn").innerText = "分析中...";
+
+        document.getElementById("loading").style.display = "block";
+    });
+</script>
+
+</body>
+</html>

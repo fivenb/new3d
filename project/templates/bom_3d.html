@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>3D BOM V2</title>
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:#0f172a;
+}
+
+#search{
+    position:absolute;
+    left:10px;
+    top:10px;
+    z-index:999;
+}
+
+#search input{
+    width:280px;
+    padding:8px;
+}
+
+#tooltip{
+    position:absolute;
+    display:none;
+    color:white;
+    background:#111827;
+    padding:6px 10px;
+    border-radius:4px;
+    z-index:9999;
+}
+
+#side-panel{
+    position:fixed;
+    top:0;
+    right:0;
+    width:320px;
+    height:100%;
+    background:#020617;
+    color:white;
+    padding:15px;
+    overflow:auto;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/static/libs/three/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="search">
+    <input
+        id="searchInput"
+        placeholder="搜索件号">
+</div>
+
+<div id="tooltip"></div>
+
+<div id="side-panel">
+    <h3>节点信息</h3>
+    <div id="nodeInfo1"></div>
+    <br><br><br>
+    <div id="nodeInfo2"></div>
+</div>
+
+<script type="module">
+
+import * as THREE from "three";
+import { OrbitControls }
+from "/static/libs/three/examples/jsm/controls/OrbitControls.js";
+
+const scene=new THREE.Scene();
+scene.background=
+    new THREE.Color(0x3a3746);
+
+const camera=
+    new THREE.PerspectiveCamera(
+        60,
+        innerWidth/innerHeight,
+        0.1,
+        5000
+    );
+camera.position.set(120,120,120);
+
+const renderer=
+    new THREE.WebGLRenderer({
+        antialias:true
+    });
+renderer.setSize(
+    innerWidth,
+    innerHeight
+);
+
+document.body.appendChild(
+    renderer.domElement
+);
+const controls=
+    new OrbitControls(
+        camera,
+        renderer.domElement
+);
+scene.add(
+    new THREE.AmbientLight(
+        0xffffff,
+        1
+    )
+);
+const light=
+    new THREE.DirectionalLight(
+        0xffffff,
+        1
+    );
+light.position.set(
+    100,
+    100,
+    100
+);
+scene.add(light);
+
+const nodeMeshes=[];
+const odsMap = new Map();
+const partMap = new Map();
+const odsToPartMap = new Map();
+const partToOdsMap = new Map();
+const activeLines = [];
+let selectClickCount = 0;
+let panelClickCount = 0;
+const COLORS = {
+    ODS: 0xffffff,
+    PART: 0x60a5fa,
+    EBOM: 0xef4444,
+    STDP: 0xfacc15,
+    DEFAULT: 0x22c55e
+};
+const raycaster=
+    new THREE.Raycaster();
+
+const mouse=
+    new THREE.Vector2();
+
+function getPartColor(type){
+    if(type==="PART")
+        return COLORS.PART;
+    if(type==="EBOM")
+        return COLORS.EBOM;
+    if(type==="STDP")
+        return COLORS.STDP;
+    return COLORS.DEFAULT;
+}
+
+function buildModel(data){
+    data.forEach(ods=>{
+        odsMap.set(
+            ods.part_number,
+            {
+                part_number: ods.part_number,
+                type:"ODS",
+                children: ods.children || [],
+                _mesh:null
+            }
+        );
+        odsToPartMap.set(
+            ods.part_number,
+            new Set()
+        );
+        (ods.children || []).forEach(part=>{
+            if(!partMap.has(part.part_number)){
+                partMap.set(
+                    part.part_number,
+                    {
+                        part_number: part.part_number,
+                        type: part.type,
+                        _mesh:null
+                    }
+                );
+
+            }
+            odsToPartMap
+                .get(ods.part_number)
+                .add(part.part_number);
+            if(!partToOdsMap.has(part.part_number)){
+                partToOdsMap.set(
+                    part.part_number,
+                    new Set()
+                );
+            }
+            partToOdsMap
+                .get(part.part_number)
+                .add(ods.part_number);
+        });
+    });
+}
+
+function getCurrentLineColor(){
+    return (
+        selectClickCount % 2 === 0
+    )
+        ? 0x00ff00      
+        : 0xffffff;    
+}
+
+function hexToCss(hex){
+    return "#" +
+        hex
+        .toString(16)
+        .padStart(6,"0");
+}
+
+function drawODSLayer(){
+    const nodes=[...odsMap.values()];
+    const cols=Math.ceil(
+        Math.sqrt(nodes.length)
+    );
+    nodes.forEach((node,index)=>{
+        const col=index%cols;
+        const row=Math.floor(index/cols);
+        const mesh=new THREE.Mesh(
+            new THREE.SphereGeometry(
+                3.5,
+                16,
+                16
+            ),
+            new THREE.MeshStandardMaterial({
+                color:COLORS.ODS
+            })
+        );
+        mesh.position.set(
+            (col-cols/2)*18,
+            35,
+            row*18
+        );
+        node._mesh=mesh;
+        mesh.userData.node=node;
+        mesh.userData.baseColor =  COLORS.ODS;
+        scene.add(mesh);
+        nodeMeshes.push(mesh);
+    });  
+}
+
+function drawPartLayer(){
+    const groups = {
+        PART: [],
+        EBOM: [],
+        STDP: [],
+        OTHER: []
+    };
+    partMap.forEach(node=>{
+        const t = node.type || "OTHER";
+        if(groups[t]){
+            groups[t].push(node);
+        }else{
+            groups.OTHER.push(node);
+        }
+    });
+    const groupPos = {
+        PART:  -100,
+        EBOM:  0,
+        STDP:   100,
+        OTHER: 150
+    };
+    Object.entries(groups)
+    .forEach(([type,nodes])=>{
+        if(nodes.length === 0){
+            return;
+        }
+        const cols =
+            Math.ceil(
+                Math.sqrt(nodes.length)
+            );
+        nodes.forEach((node,index)=>{
+            const col =
+                index % cols;
+            const row =
+                Math.floor(
+                    index / cols
+                );
+            const mesh =
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        2.5,
+                        16,
+                        16
+                    ),
+                    new THREE.MeshStandardMaterial({
+                        color:getPartColor(
+                            node.type
+                        )
+                    })
+                );
+            mesh.position.set(
+                groupPos[type] +
+                (col - cols / 2) * 10,
+                -35,
+                row * 10
+            );
+            mesh.userData.node = node;
+            mesh.userData.baseColor =
+                getPartColor(node.type);
+            node._mesh = mesh;
+            scene.add(mesh);
+            nodeMeshes.push(mesh);
+        });
+    });
+}
+
+function drawLayerText(
+    text,
+    x,
+    y,
+    z,
+    color = "white"
+){
+    const canvas =
+        document.createElement("canvas");
+    const ctx =
+        canvas.getContext("2d");
+    canvas.width = 512;
+    canvas.height = 128;
+    ctx.font =
+        "bold 60px sans-serif";
+
+    ctx.fillStyle = color;
+    ctx.fillText(
+        text,
+        50,
+        80
+    );
+    const tex =
+        new THREE.CanvasTexture(
+            canvas
+        );
+    const sprite =
+        new THREE.Sprite(
+            new THREE.SpriteMaterial({
+                map: tex,
+                transparent:true
+            })
+        );
+    sprite.scale.set(
+        80,
+        20,
+        1
+    );
+    sprite.position.set(
+        x,
+        y,
+        z
+    );
+    scene.add(sprite);
+}
+
+function clearHighlights(){
+    activeLines.forEach(
+        line=>scene.remove(line)
+    );
+    activeLines.length = 0;
+    [...odsMap.values()].forEach(node=>{
+        if(!node._mesh) return;
+        const mesh =
+            node._mesh;
+        const mat =
+            mesh.material;
+        mesh.scale.set(
+            1,1,1
+        );
+        mat.color.setHex(
+            mesh.userData.baseColor
+        );
+        if(mat.emissive){
+            mat.emissive.setHex(
+                0x000000
+            );
+            mat.emissiveIntensity =
+                0;
+        }
+    });
+    [...partMap.values()].forEach(node=>{
+        if(!node._mesh) return;
+        const mesh =
+            node._mesh;
+        const mat =
+            mesh.material;
+        mesh.scale.set(
+            1,1,1
+        );
+        mat.color.setHex(
+            mesh.userData.baseColor
+        );
+        if(mat.emissive){
+            mat.emissive.setHex(
+                0x000000
+            );
+            mat.emissiveIntensity =
+                0;
+        }
+    });
+    panelClickCount = 0;
+  document.getElementById(
+    "nodeInfo1"
+  ).innerHTML = "";
+  document.getElementById(
+    "nodeInfo2"
+  ).innerHTML = "";
+}
+
+function drawLine(a,b,color){
+    const start = a.clone();
+    const end   = b.clone();
+    let top = start;
+    let bottom = end;
+    if(start.y < end.y){
+        top = end;
+        bottom = start;
+    }
+    const span =
+        top.y - bottom.y;
+    const offset = 6;
+    const c1 =
+      new THREE.Vector3(
+        top.x + offset,
+        top.y - span * 0.8,
+        top.z
+    );
+    const c2 =
+      new THREE.Vector3(
+        bottom.x + offset,
+        top.y - span * 0.2,
+        bottom.z
+    );
+    const curve =
+        new THREE.CubicBezierCurve3(
+            top,
+            c1,
+            c2,
+            bottom
+        );
+    const points =
+        curve.getPoints(40);
+    const geometry =
+        new THREE.BufferGeometry()
+        .setFromPoints(points);
+    const material =
+        new THREE.LineBasicMaterial({
+            color,
+            transparent:true,
+            opacity:0.9
+        });
+    const line =
+        new THREE.Line(
+            geometry,
+            material
+        );
+    scene.add(line);
+    activeLines.push(line);
+}
+
+function emphasizeNode(mesh){
+    if(!mesh) return;
+    mesh.scale.set(
+        1.6,
+        1.6,
+        1.6
+    );
+    const mat = mesh.material;
+    if(mat && mat.emissive){
+        // 使用节点原色发光
+        mat.emissive.setHex(
+            mesh.userData.baseColor
+        );
+        mat.emissiveIntensity = 0.6;
+    }
+}
+
+function showNodeInfo(html){
+    const box1 =
+        document.getElementById(
+            "nodeInfo1"
+        );
+    const box2 =
+        document.getElementById(
+            "nodeInfo2"
+        );
+    if(panelClickCount % 2 === 0){
+        box1.innerHTML =
+            html;
+        box2.innerHTML =
+            "";
+    }else{
+        box2.innerHTML =
+            html;
+    }
+    panelClickCount++;
+}
+
+function highlightODS(node){
+    emphasizeNode(
+      node._mesh
+    );
+    const parts=
+        odsToPartMap.get(
+            node.part_number
+        );
+    let html=`
+        <b>${node.part_number}</b><br>
+        <b>类型：</b>${node.type}
+        <hr>
+        <b>下层零件</b><br>
+    `;
+    parts.forEach(pn=>{
+      const part =
+        partMap.get(pn);
+      if(!part) return;
+      emphasizeNode(part._mesh);
+      drawLine(
+        node._mesh.position,
+        part._mesh.position,
+        getCurrentLineColor()
+    );
+      html += `
+        ${pn}
+        <span style="
+            color:#94a3b8;
+            font-size:12px;
+        ">
+        [${part.type}]
+        </span>
+        <br>
+    `;
+});
+    showNodeInfo(html);
+}
+
+function highlightPart(node){
+    emphasizeNode(node._mesh);
+    const odsList=
+        partToOdsMap.get(
+            node.part_number
+        );
+    let html=`
+        <b>${node.part_number}</b><br>
+        <b>类型：</b>${node.type}
+        <hr>
+        <b>引用ODS</b><br>
+    `;
+    odsList.forEach(pn=>{
+        const ods=
+            odsMap.get(pn);
+        if(!ods) return;
+        emphasizeNode(
+          ods._mesh
+         );
+        drawLine(
+            ods._mesh.position,
+            node._mesh.position,
+            getCurrentLineColor()
+        );
+        html+=pn+"<br>";
+    });
+    showNodeInfo(html);
+}
+
+function findNode(pn){
+    if(
+        odsMap.has(pn)
+    ){
+        return odsMap.get(pn);
+    }
+    if(
+        partMap.has(pn)
+    ){
+        return partMap.get(pn);
+    }
+    return null;
+}
+
+function animate(){
+    requestAnimationFrame(
+        animate
+    );
+    controls.update();
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+fetch("/static/bom_tree_L4.json")
+.then(r=>r.json())
+.then(data=>{
+    buildModel(data);
+    drawODSLayer();
+    drawPartLayer();
+    drawLayerText(
+        "ODS",
+        0,
+        50,
+        -60,
+        hexToCss(COLORS.ODS)
+    );
+    drawLayerText(
+      "PART",
+      -100,
+      -20,
+      -20,
+      hexToCss(COLORS.PART)
+);
+    drawLayerText(
+      "EBOM",
+      0,
+      -20,
+      -20,
+      hexToCss(COLORS.EBOM)
+);
+    drawLayerText(
+      "STDP",
+      100,
+      -20,
+      -20,
+      hexToCss(COLORS.STDP)
+);
+});
+
+window.addEventListener(
+    "mousemove",
+    e=>{
+    mouse.x =
+        e.clientX /
+        innerWidth * 2 - 1;
+    mouse.y =
+       -(e.clientY /
+       innerHeight * 2 - 1);
+    raycaster.setFromCamera(
+        mouse,
+        camera
+    );
+    const hit =
+        raycaster
+        .intersectObjects(
+            nodeMeshes
+        )[0];
+    const tip =
+        document.getElementById(
+            "tooltip"
+        );
+    if(hit){
+        const node =
+            hit.object.userData.node;
+        tip.style.display =
+            "block";
+        tip.style.left =
+            e.clientX+10+"px";
+        tip.style.top =
+            e.clientY+10+"px";
+        tip.innerHTML =
+            node.part_number +
+            "<br>" +
+            node.type;
+    }else{
+        tip.style.display =
+            "none";
+    }
+});
+
+window.addEventListener(
+    "click",
+    ()=>{
+    raycaster.setFromCamera(
+        mouse,
+        camera
+    );
+    const hit =
+        raycaster
+        .intersectObjects(
+            nodeMeshes
+        )[0];
+    if(!hit) return;
+    const node =
+        hit.object.userData.node;
+    if(!node) return;
+    // 第1、3、5次点击
+    if(selectClickCount % 2 === 0){
+        clearHighlights();
+    }
+    selectClickCount++;
+    if(node.type==="ODS")
+        highlightODS(node);
+    else
+        highlightPart(node);
+});
+
+searchInput.addEventListener(
+"keydown",
+e=>{
+if(e.key!=="Enter")
+    return;
+const node=
+    findNode(
+        searchInput.value.trim()
+    );
+if(!node){
+    alert("未找到");
+    return;
+}
+if(node.type==="ODS")
+    highlightODS(node);
+else
+    highlightPart(node);
+controls.target.copy(
+    node._mesh.position
+);
+controls.update();
+});
+animate();
+</script>
+</body>
+</html>
